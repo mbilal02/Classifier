@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 
-
 class DeepLearner(ABC):
     """
     creating a abstract class to get layers
@@ -29,9 +28,6 @@ class DeepLearner(ABC):
     @abstractmethod
     def get_evaluation(self):
         pass
-
-
-
 
 
 

@@ -1,13 +1,13 @@
 from collections import Counter
-import tensorflow as tf
-from keras.preprocessing.sequence import pad_sequences
+
 import keras as keras
 
-sent_max = 50
+sent_max = 100
 
 
 class ReadFile:
     def fileReader(self, filename):
+
         words = []
         labes = []
 
@@ -35,7 +35,6 @@ class ReadFile:
         return sentences
 
     def process(self, sentences):
-        print(sentences)
         x = list()
         y = list()
         label_vocab = self.get_label_vocab()
@@ -54,42 +53,119 @@ class ReadFile:
 
     def get_label_vocab(self):
 
-        return {'O': 0
-            , 'B-PER': 1
-            , 'I-PER': 2
-            , 'B-LOC': 3
-            , 'I-LOC': 4
-            , 'B-MISC': 5
-            , 'I-MISC': 6
-            , 'B-ORG': 7
-            , 'I-ORG': 8}
+        return {'o'+'\n': 0,
+                'o':0
+            , 'b-per\n': 1
+            , 'i-per\n': 2
+            , 'b-loc\n': 3
+            , 'i-loc\n': 4
+            , 'b-misc\n': 5
+            , 'i-misc\n': 6
+            , 'b-org\n': 7
+            , 'i-org\n': 8}
 
-    def pad_xSequences(self, sentences):
-        """
-        padding the of the sentences with the max sentence length
-        max lenght of sentence let 100 words
-        sentence pad with pad
-        :return: list of ist of sentences
-        """
-        max_length = 120
-        if not sentences:
-            padded = pad_sequences(sentences, padding='post', maxlen=max_length)
-
-        return padded
+    def get_masks(self,tokens, max_seq_length):
+        """Mask for padding"""
+        if len(tokens) > max_seq_length:
+            raise IndexError("Token length more than max seq length!")
+        return [1] * len(tokens) + [0] * (max_seq_length - len(tokens))
 
     # raise NotImplementedError
 
+    def get_segments(self, tokens, max_seq_length):
+        """Segments: 0 for the first sequence, 1 for the second"""
+        if len(tokens) > max_seq_length:
+            raise IndexError("Token length more than max seq length!")
+        segments = []
+        current_segment_id = 0
+        for token in tokens:
+            segments.append(current_segment_id)
+            if token == "[SEP]":
+                current_segment_id = 1
+        return segments + [0] * (max_seq_length - len(tokens))
 
-def create_matrices(self, sentences):
-    x, y = self.process(sentences)
+    def get_ids(self, tokens, tokenizer, max_seq_length):
+        """Token ids from Tokenizer vocab"""
+        token_ids = tokenizer.convert_tokens_to_ids(tokens)
+        input_ids = token_ids + [0] * (max_seq_length - len(token_ids))
+        return input_ids
+
+    # def create_matrices(self, sentences):
+    #   x, y = self.process(sentences)
     # TODO: implement above pad_xSequences and then call that function here to pad x equal to the sentence max_len
-    global sent_max
-    y = tf.keras.preprocessing.sequence.pad_sequences(y, maxlen=sent_max, padding='post')
+    #   global sent_max
+    # y = tf.keras.preprocessing.sequence.pad_sequences(y, maxlen=sent_max, padding='post')
 
-    import numpy as np
+    # import numpy as np
 
-    x = np.array(x)
+    # x = np.array(x)
 
-    y = np.array(y)
+    # y = np.array(y)
 
-    return x, y
+    #  return x, y
+    def wrapper_sequences(self):
+        all_sents = list()
+        files = ['train.txt', 'valid.txt', 'test.txt']
+        root = 'data/'
+        for filename in files:
+            file = self.fileReader(root + filename)
+            file += file
+            all_sents.append(file)
+        x_tr, y_tr = self.process(all_sents[0])
+        x_val, y_val = self.process(all_sents[1])
+        x_ts, y_ts = self.process(all_sents[2])
+        import tensorflow as tf
+        y_tr =tf.keras.preprocessing.sequence.pad_sequences(y_tr, maxlen=100, padding='post')
+        y_val = tf.keras.preprocessing.sequence.pad_sequences(y_val, maxlen=100, padding='post')
+        y_ts = tf.keras.preprocessing.sequence.pad_sequences(y_ts, maxlen=100, padding='post')
+
+        X = x_tr + x_val + x_ts
+        return X, x_tr, x_val, x_ts, y_tr, y_val, y_ts
+
+    def encode(self, X):
+        words = list()
+        for sentence in X:
+            for word in sentence:
+                words.append(word)
+        word_counts = Counter(words)
+        vocab_inv = [x[0] for x in word_counts.most_common()]
+        vocab = {x: i + 1 for i, x in enumerate(vocab_inv)}
+        id_to_vocb = {i: x for x, i in vocab.items()}
+        return vocab
+
+    def encoding_sequences(self,X,sentences):
+        vocab = self.encode(X)
+        sents = list()
+        for sentence in sentences:
+            sent= list()
+            for word in sentence:
+                sent.append(vocab[word])
+            sents.append(sent)
+        return sents
+
+    def model_data(self):
+        X, x_tr, x_val, x_ts, y_tr, y_val, y_ts = self.wrapper_sequences()
+        X_train= self.encoding_sequences(X, x_tr)
+        X_val = self.encoding_sequences(X, x_val)
+        X_test = self.encoding_sequences(X, x_ts)
+
+        return X_train, X_val, X_test, y_tr, y_val, y_ts
+
+    def sequence_helper(self,x_in, sent_maxlen):
+        '''
+        Helper function for word sequences (text data sepcific)
+        :param x_in:
+        :param sent_maxlen:
+        :return: Word sequences
+        '''
+
+        new_X = []
+        for seq in x_in:
+            new_seq = []
+            for i in range(sent_maxlen):
+                try:
+                    new_seq.append(seq[i])
+                except:
+                    new_seq.append('__pad__')
+            new_X.append(new_seq)
+        return new_X
