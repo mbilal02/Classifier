@@ -1,14 +1,22 @@
 import tensorflow_hub as hub
 import tensorflow as tf
 from keras import Input, Model
-from keras.callbacks import EarlyStopping
+from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.engine import Layer
 from keras.layers import Embedding, LSTM, Dense, Bidirectional, Lambda, TimeDistributed
 import keras.backend as K
 import sklearn as sklearn
 from tensorflow.python.keras.backend import concatenate
 
+from evaluation.eval import get_wnut_evaluation
 from utils.util import ReadFile
+
+def get_available_devices():
+    local_device_protos = K.device_lib.list_local_devices()
+    return [x.name for x in local_device_protos]
+
+get_available_devices()
+
 
 elmo_model = 'https://tfhub.dev/google/elmo/2'
 
@@ -56,8 +64,12 @@ def ner_classifier():
     x_tr = obj.sequence_helper(x_tr, 100)
     x_val = obj.sequence_helper(x_val, 100)
     x_ts = obj.sequence_helper(x_ts, 100)
-
-
+    print(len(x_ts))
+    print(len(x_val))
+    print(len(x_tr))
+    print(len(y_ts))
+    print(len(y_val))
+    print(len(x_tr))
     word_input = Input(shape=(100,), dtype="string")
     embedding = Lambda(DeepContextualRepresentation, output_shape=(100, 1024))(word_input)
     bi_rnn = Bidirectional(LSTM(units=256,
@@ -78,17 +90,30 @@ def ner_classifier():
     y_ts = y_ts.reshape(y_ts.shape[0], y_ts.shape[1],1)
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     model.summary()
-    callback = EarlyStopping(monitor= 'val_loss', patience=3 )
-    model.fit(np.array(x_tr), np.array(y_tr),
-              validation_data=[np.array(x_val), np.array(y_val)],
-              batch_size=20,
-              epochs=20,
-              callbacks =[callback])
-    prediction = model.predict(np.array(x_ts), np.array(y_ts), verbose=1)
+    #callback = EarlyStopping(monitor= 'val_loss', patience=2 )
+    checkpointer = ModelCheckpoint(filepath= 'model.hdf5',
+                                   verbose=1,
+                                   save_best_only=True)
+    earlystopper = EarlyStopping(monitor='val_loss',
+                                 patience=1,
+                                 verbose=1)
+    with(tf.device('/gpu:0')):
 
-    prediction = np.argmax(prediction, axis=-1)
-    print('printing the classification results')
-    print(sklearn.metrics.classification.classification_report(np.array(y_ts), np.array(prediction)))
+        model.fit(np.array(x_tr), np.array(y_tr),
+                  validation_data=[np.array(x_val), np.array(y_val)],
+                  batch_size=20,
+                  epochs=2,
+                  callbacks=[checkpointer, earlystopper])
+        prediction = model.predict(np.array(x_ts), np.array(y_ts), verbose=1)
+
+        prediction = np.argmax(prediction, axis=-1)
+        print('printing the classification results')
+        #print(sklearn.metrics.classification.classification_report(np.array(y_ts), np.array(prediction)))
+        obj = ReadFile()
+        true = obj.getLabels(y_ts, vocabulary=obj.get_label_vocab())
+        pred = obj.getLabels(prediction, vocabulary=obj.get_label_vocab())
+        obj.save_predictions('result.tsv', x_ts, true, pred )
+        get_wnut_evaluation('result.tsv')
 
 if __name__ == '__main__':
     ner_classifier()

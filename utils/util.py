@@ -1,3 +1,4 @@
+import csv
 from collections import Counter
 
 import keras as keras
@@ -169,3 +170,36 @@ class ReadFile:
                     new_seq.append('__pad__')
             new_X.append(new_seq)
         return new_X
+
+
+    def getLabels(self,y_test, vocabulary):
+        '''
+        Maps integer to the label map
+        '''
+        #
+        classes = []
+        # y = np.array(y_test).tolist()
+        for i in y_test:
+            label = []
+            pre = [[k for k, v in vocabulary.items() if v == j] for j in i]
+            for i in pre:
+                for j in i:
+                    label.append(j)
+            classes.append(label)
+        return classes
+
+    def write_f(self,filename, dataset, delimiter='\t'):
+        """dataset is a list of tweets where each token can be a tuple of n elements"""
+        with open(filename, '+w', encoding='utf8') as stream:
+            writer = csv.writer(stream, delimiter=delimiter, quoting=csv.QUOTE_NONE, quotechar='')
+
+            for tweet in dataset:
+                writer.writerow(list(tweet))
+    def save_predictions(self,filename, tweets, labels, predictions):
+        """save a file with token, label and prediction in each row"""
+        dataset, i = [], 0
+        for n, tweet in enumerate(tweets):
+            tweet_data = list(zip(tweet, labels[n], predictions[n]))
+            dataset += tweet_data + [()]
+        self.write_f(filename, dataset)
+
