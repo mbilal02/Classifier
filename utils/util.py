@@ -2,38 +2,28 @@ import csv
 from collections import Counter
 
 import keras as keras
+from nltk.corpus.reader.conll import ConllCorpusReader
 
 sent_max = 100
 
 
 class ReadFile:
+
     def fileReader(self, filename):
 
-        words = []
-        labes = []
+        '''
+        Data reader for CoNLL format data
+        '''
+        root = "data/"
+        sentences = []
 
-        with open(filename, mode='rt', encoding='utf8') as f:
-            sentences = []
-            sentence = []
-            for line in f:
-                if len(line) == 0 or line.startswith('-DOCSTART') or line[0] == "\n":
-                    if len(sentence) > 0:
-                        sentences.append(sentence)
-                        sentence = []
-                    continue
-                splits = line.split(' ')
-                sentence.append([splits[0].lower(), splits[-1].lower()])
-                words.append([splits[0].lower()])
-                labes.append([splits[-1].lower()])
-        if len(sentence) > 0:
-            sentences.append(sentence)
-            # print(sentences)
-        #
-        # words_counts = Counter(words)
-        # vocb_list = [x[0] for x in words_counts.most_common()]
-        # vocb = {x: i + 1 for i,x in enumerate(vocb_list)}
-        # #vocb[vocb_list]=
-        return sentences
+        ccorpus = ConllCorpusReader(root, ".conll", ('words', 'pos', 'tree'))
+
+        tagged = ccorpus.tagged_sents(filename)
+
+        return tagged
+
+
 
     def process(self, sentences):
         x = list()
@@ -54,16 +44,29 @@ class ReadFile:
 
     def get_label_vocab(self):
 
-        return {'o'+'\n': 0,
-                'o':0
-            , 'b-per\n': 1
-            , 'i-per\n': 2
-            , 'b-loc\n': 3
-            , 'i-loc\n': 4
-            , 'b-misc\n': 5
-            , 'i-misc\n': 6
-            , 'b-org\n': 7
-            , 'i-org\n': 8}
+        return {
+        'I-tvshow': 20,
+        'B-tvshow': 19,
+        'I-sportsteam': 18,
+        'B-sportsteam': 17,
+        'I-product': 16,
+        'B-product': 15,
+        'I-person': 14,
+        'B-person': 13,
+        'I-other': 12,
+        'B-other': 11,
+        'I-musicartist': 10,
+        'B-musicartist': 9,
+        'I-movie': 8,
+        'B-movie': 7,
+        'I-geo-loc': 6,
+        'B-geo-loc': 5,
+        'I-facility': 4,
+        'B-facility': 3,
+        'I-company': 2,
+        'B-company': 1,
+        'O': 0}
+
 
     def get_masks(self,tokens, max_seq_length):
         """Mask for padding"""
@@ -106,15 +109,14 @@ class ReadFile:
     #  return x, y
     def wrapper_sequences(self):
         all_sents = list()
-        files = ['train.txt', 'valid.txt', 'test.txt']
-        root = 'data/'
-        for filename in files:
-            file = self.fileReader(root + filename)
-            file += file
-            all_sents.append(file)
-        x_tr, y_tr = self.process(all_sents[0])
-        x_val, y_val = self.process(all_sents[1])
-        x_ts, y_ts = self.process(all_sents[2])
+        files = ['train_2016', 'dev_2016', 'test_2016']
+        #root = 'data/'
+        train = self.fileReader(files[0])
+        dev = self.fileReader(files[1])
+        test = self.fileReader(files[2])
+        x_tr, y_tr = self.process(train)
+        x_val, y_val = self.process(dev)
+        x_ts, y_ts = self.process(test)
         import tensorflow as tf
         y_tr =tf.keras.preprocessing.sequence.pad_sequences(y_tr, maxlen=100, padding='post')
         y_val = tf.keras.preprocessing.sequence.pad_sequences(y_val, maxlen=100, padding='post')

@@ -5,18 +5,17 @@ from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.engine import Layer
 from keras.layers import Embedding, LSTM, Dense, Bidirectional, Lambda, TimeDistributed
 import keras.backend as K
-import sklearn as sklearn
 from tensorflow.python.keras.backend import concatenate
 
 from evaluation.eval import get_wnut_evaluation
 from utils.util import ReadFile
-
+"""
 def get_available_devices():
     local_device_protos = K.device_lib.list_local_devices()
     return [x.name for x in local_device_protos]
 
 get_available_devices()
-
+"""
 
 elmo_model = 'https://tfhub.dev/google/elmo/2'
 
@@ -38,7 +37,7 @@ class ElmoEmbeddingLayer(Layer):
     def call(self, x, mask=None):
         result = self.elmo(inputs={
             "tokens": tf.squeeze(tf.cast(x, tf.string)),
-            "sequence_len": tf.constant(20 * [100])
+            "sequence_len": tf.constant(50 * [100])
         },
             signature="tokens",
             as_dict=True)["elmo"]
@@ -53,7 +52,7 @@ def DeepContextualRepresentation(x):
     sess.run(tf.tables_initializer())
     return elmo_model(inputs={
         "tokens": tf.squeeze(tf.cast(x, "string")),
-        "sequence_len": tf.constant(20 * [100])
+        "sequence_len": tf.constant(50 * [100])
     },
         signature="tokens",
         as_dict=True)["elmo"]
@@ -78,7 +77,7 @@ def ner_classifier():
                                dropout=0.3,
                                recurrent_dropout=0.3)) (embedding)
 
-    prediction_layer = (Dense(units=9, activation='softmax'))(bi_rnn)
+    prediction_layer = (Dense(units=21, activation='softmax'))(bi_rnn)
     model = Model(inputs=word_input, outputs=prediction_layer)
     import numpy as np
     y_tr = np.array(y_tr)
@@ -95,25 +94,25 @@ def ner_classifier():
                                    verbose=1,
                                    save_best_only=True)
     earlystopper = EarlyStopping(monitor='val_loss',
-                                 patience=1,
+                                 patience=3,
                                  verbose=1)
-    with(tf.device('/gpu:0')):
+    
 
-        model.fit(np.array(x_tr), np.array(y_tr),
-                  validation_data=[np.array(x_val), np.array(y_val)],
-                  batch_size=20,
-                  epochs=2,
-                  callbacks=[checkpointer, earlystopper])
-        prediction = model.predict(np.array(x_ts), np.array(y_ts), verbose=1)
+    model.fit(np.array(x_tr), np.array(y_tr),
+        validation_data=[np.array(x_val), np.array(y_val)],
+        batch_size=50,
+        epochs=15,
+        callbacks=[checkpointer, earlystopper])
+    prediction = model.predict(np.array(x_ts), np.array(y_ts), verbose=1)
 
-        prediction = np.argmax(prediction, axis=-1)
-        print('printing the classification results')
-        #print(sklearn.metrics.classification.classification_report(np.array(y_ts), np.array(prediction)))
-        obj = ReadFile()
-        true = obj.getLabels(y_ts, vocabulary=obj.get_label_vocab())
-        pred = obj.getLabels(prediction, vocabulary=obj.get_label_vocab())
-        obj.save_predictions('result.tsv', x_ts, true, pred )
-        get_wnut_evaluation('result.tsv')
+    prediction = np.argmax(prediction, axis=-1)
+    print('printing the classification results')
+    #print(sklearn.metrics.classification.classification_report(np.array(y_ts), np.array(prediction)))
+    obj = ReadFile()
+    true = obj.getLabels(y_ts, vocabulary=obj.get_label_vocab())
+    pred = obj.getLabels(prediction, vocabulary=obj.get_label_vocab())
+    obj.save_predictions('result.tsv', x_ts, true, pred )
+    get_wnut_evaluation('result.tsv')
 
 if __name__ == '__main__':
     ner_classifier()
