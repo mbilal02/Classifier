@@ -47,7 +47,7 @@ def get_sents(lines):
 
 Token = namedtuple('Token', 'sent_id word_id word bio tag')
 wnut_bio = ('B', 'I', 'O')
-wnut_tags = ('tv-show', 'person', 'product', 'music-artist', 'movie', 'facility', 'company', 'geo-loc', 'other',
+wnut_tags = ('tvshow', 'person', 'product', 'musicartist', 'movie', 'facility', 'company', 'geo-loc', 'other',
            'sportsteam')
 
 

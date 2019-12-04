@@ -80,9 +80,9 @@ def ner_classifier():
     prediction_layer = (Dense(units=21, activation='softmax'))(bi_rnn)
     model = Model(inputs=word_input, outputs=prediction_layer)
     import numpy as np
-    y_tr = np.array(y_tr)
-    y_val = np.array(y_val)
-    y_ts = np.array(y_ts)
+    y_tr = np.asarray(y_tr)
+    y_val = np.asarray(y_val)
+    y_ts = np.asarray(y_ts)
     print(y_tr.shape)
     y_tr = y_tr.reshape(y_tr.shape[0], y_tr.shape[1],1)
     y_val = y_val.reshape(y_val.shape[0], y_val.shape[1],1)
@@ -94,16 +94,16 @@ def ner_classifier():
                                    verbose=1,
                                    save_best_only=True)
     earlystopper = EarlyStopping(monitor='val_loss',
-                                 patience=3,
+                                 patience=1,
                                  verbose=1)
     
 
     model.fit(np.array(x_tr), np.array(y_tr),
-        validation_data=[np.array(x_val), np.array(y_val)],
+        validation_data=[np.asarray(x_val), np.asarray(y_val)],
         batch_size=50,
-        epochs=15,
+        epochs=1,
         callbacks=[checkpointer, earlystopper])
-    prediction = model.predict(np.array(x_ts), np.array(y_ts), verbose=1)
+    prediction = model.predict(np.asarray(x_ts), batch_size=50, verbose=1)
 
     prediction = np.argmax(prediction, axis=-1)
     print('printing the classification results')
